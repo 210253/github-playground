@@ -117,6 +117,12 @@ header .meta {
 }
 .card p { margin: 6px 0; font-size: 14.5px; }
 .card ul { margin: 6px 0; padding-left: 20px; font-size: 14.5px; }
+/* a card that just arrived via live refresh flashes yellow */
+.card--new { animation: newcard 2.4s ease-out; }
+@keyframes newcard {
+  0% { background: var(--yellow); transform: scale(0.96); }
+  100% { background: #ffffff; transform: scale(1); }
+}
 .empty {
   margin-top: 40px;
   padding: 32px;
@@ -135,6 +141,44 @@ footer {
 }
 footer a { color: var(--gray); }
 
+/* ---------- live (stage) mode ---------- */
+#live {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 50;
+  padding: 8px 16px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  background: #ffffff;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  box-shadow: 4px 4px 0 var(--yellow);
+  cursor: pointer;
+}
+#live:hover { background: var(--yellow); }
+#live.on { background: var(--yellow); }
+#live .dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 8px;
+  border-radius: 50%;
+  background: var(--gray);
+  vertical-align: 1px;
+}
+#live.on .dot {
+  background: var(--ink);
+  animation: pulse 1.6s infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
 /* ---------- phones ---------- */
 @media (max-width: 720px) {
   .wrap { padding: 28px 20px 40px; }
@@ -151,17 +195,21 @@ footer a { color: var(--gray); }
     letter-spacing: 0.04em;
     overflow-wrap: anywhere;
   }
+  #live { top: 12px; right: 12px; padding: 6px 12px; font-size: 12px; }
 }
 </style>
 </head>
 <body>
+<button id="live" type="button" aria-pressed="false">
+  <span class="dot"></span><span class="label">AUTO PLAY</span>
+</button>
 <div class="wrap">
 <header>
   <h1>GitHub <span>Playground</span></h1>
-  <p class="meta">1 profile · PROFILES/ · REBUILT BY CI</p>
+  <p class="meta">1 PROFILE · PROFILES/ · REBUILT BY CI</p>
 </header>
 <div class="grid">
-<section class="card">
+<section class="card" data-user="hnrobert">
   <img src="https://github.com/hnrobert.png?size=112" alt="hnrobert" loading="lazy">
   <h2><a href="https://github.com/hnrobert">hnrobert</a></h2>
   <div class="at">@hnrobert</div>
@@ -178,5 +226,96 @@ footer a { color: var(--gray); }
   <a href="https://github.com/CompPsyUnion/github-playground">SOURCE ON GITHUB</a>
 </footer>
 </div>
+<script>
+(function () {
+  var btn = document.getElementById('live');
+  var meta = document.querySelector('header .meta');
+  var grid = document.querySelector('.grid');
+  var on = false, timer = null, raf = null;
+
+  var SCROLL_SPEED = 30;    // px per second
+  var BOTTOM_PAUSE = 2500;  // ms to hold at the bottom before looping
+  var FETCH_EVERY = 10000;  // ms between page re-fetches
+
+  /* ---------- endless slow scroll ---------- */
+  var lastTs = 0, holdUntil = 0;
+  function step(ts) {
+    if (!on) { raf = null; return; }
+    if (!lastTs) lastTs = ts;
+    var dt = (ts - lastTs) / 1000;
+    lastTs = ts;
+    var doc = document.documentElement;
+    var max = doc.scrollHeight - window.innerHeight;
+    if (max > 0 && window.scrollY >= max - 1 && !holdUntil) {
+      holdUntil = ts + BOTTOM_PAUSE;
+    }
+    if (holdUntil) {
+      if (ts >= holdUntil) { holdUntil = 0; window.scrollTo(0, 0); }
+    } else {
+      window.scrollTo(0, Math.min(max, window.scrollY + SCROLL_SPEED * dt));
+    }
+    raf = requestAnimationFrame(step);
+  }
+
+  /* ---------- data refresh ---------- */
+  function existing() {
+    var names = {};
+    grid.querySelectorAll('.card[data-user]').forEach(function (c) {
+      names[c.getAttribute('data-user')] = true;
+    });
+    return names;
+  }
+
+  function updateCount(n) {
+    if (meta) {
+      meta.textContent = n + ' PROFILE' + (n === 1 ? '' : 'S') +
+        ' · PROFILES/ · REBUILT BY CI' + (on ? ' · LIVE' : '');
+    }
+  }
+
+  function fetchNew() {
+    /* re-fetch the page itself and diff its cards against the live DOM */
+    fetch(window.location.href, { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.text() : null; })
+      .then(function (text) {
+        if (!text) return;
+        var doc = new DOMParser().parseFromString(text, 'text/html');
+        var fresh = doc.querySelectorAll('.card[data-user]');
+        if (!fresh.length) return;
+        var have = existing();
+        var added = 0;
+        fresh.forEach(function (card) {
+          if (have[card.getAttribute('data-user')]) return;
+          var node = document.importNode(card, true);
+          node.classList.add('card--new');
+          grid.appendChild(node);
+          added++;
+        });
+        if (!added) return;
+        var empty = grid.querySelector('.empty');
+        if (empty) empty.remove();
+        updateCount(Object.keys(existing()).length);
+      })
+      .catch(function () { /* stage safety: stay quiet on network hiccups */ });
+  }
+
+  /* ---------- the button ---------- */
+  btn.addEventListener('click', function () {
+    on = !on;
+    btn.classList.toggle('on', on);
+    btn.querySelector('.label').textContent = on ? 'LIVE' : 'AUTO PLAY';
+    if (on) {
+      lastTs = 0; holdUntil = 0;
+      raf = requestAnimationFrame(step);
+      timer = setInterval(fetchNew, FETCH_EVERY);
+      fetchNew();
+    } else {
+      cancelAnimationFrame(raf); raf = null;
+      clearInterval(timer); timer = null;
+    }
+    updateCount(Object.keys(existing()).length);
+  });
+})();
+</script>
 </body>
 </html>
