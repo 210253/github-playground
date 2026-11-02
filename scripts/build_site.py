@@ -18,84 +18,130 @@ OUTPUT = ROOT / "docs" / "index.html"
 REPO_URL = "https://github.com/CompPsyUnion/github-playground"
 
 STYLE = """
+/* CPU brand: yellow #f7d447 / ink #111 / white — Swiss poster style with
+   blueprint dashed guides and yellow-shadow window cards (see the cpu
+   Marp theme for the deck counterpart). */
 :root {
-  --ink: #16130c;
-  --muted: #7a7360;
-  --paper: #fdfaf0;
-  --card: #ffffff;
-  --line: #e8dfc6;
-  --accent: #f4c518;
-  --accent-ink: #16130c;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --ink: #f2ecd9;
-    --muted: #a89f87;
-    --paper: #191610;
-    --card: #211d15;
-    --line: #3a342a;
-    --accent: #f4c518;
-  }
+  --yellow: #f7d447;
+  --ink: #111111;
+  --gray: #a3a3a3;
+  --grid: #e3d5a8;
+  --sans: 'Noto Sans SC', 'PingFang SC', 'Hiragino Sans', sans-serif;
+  --display: 'Archivo Black', 'Arial Black', 'Noto Sans SC', sans-serif;
+  --mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 }
 * { box-sizing: border-box; }
 body {
   margin: 0;
-  font-family: -apple-system, "Segoe UI", Roboto, "PingFang SC",
-    "Noto Sans SC", "Hiragino Sans GB", sans-serif;
-  background: var(--paper);
+  font-family: var(--sans);
+  font-weight: 500;
+  background: #ffffff;
   color: var(--ink);
   line-height: 1.6;
 }
-.wrap { max-width: 1080px; margin: 0 auto; padding: 48px 24px 64px; }
-header h1 { margin: 0 0 6px; font-size: 40px; letter-spacing: -0.5px; }
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 56px 64px 72px;
+  position: relative;
+}
+/* blueprint margin guides, as on every CPU slide */
+.wrap::before {
+  content: '';
+  position: absolute;
+  top: 24px;
+  bottom: 24px;
+  left: 28px;
+  right: 28px;
+  border-left: 2px dashed var(--grid);
+  border-right: 2px dashed var(--grid);
+  pointer-events: none;
+}
+header h1 {
+  margin: 0 0 10px;
+  font-family: var(--display);
+  font-size: 44px;
+  font-weight: 400;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
 header h1 span {
-  background: var(--accent);
-  color: var(--accent-ink);
-  padding: 0 10px;
+  display: inline-block;
+  background: var(--yellow);
+  padding: 0 14px;
   border-radius: 6px;
 }
-header p { margin: 0; color: var(--muted); }
-.grid {
-  margin-top: 36px;
-  display: grid;
-  gap: 20px;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+header .meta {
+  font-family: var(--mono);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #c9b96c;
 }
+.grid {
+  margin-top: 40px;
+  display: grid;
+  gap: 28px;
+  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+}
+/* the CPU window card: ink border + yellow offset shadow */
 .card {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 22px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  background: #ffffff;
+  border: 2.5px solid var(--ink);
+  border-radius: 12px;
+  padding: 22px 24px;
+  box-shadow: 7px 7px 0 var(--yellow);
 }
 .card img {
   width: 56px;
   height: 56px;
+  border: 2.5px solid var(--ink);
   border-radius: 50%;
   float: right;
   margin-left: 12px;
+  background: var(--yellow);
 }
-.card h2 { margin: 0; font-size: 20px; }
+.card h2 { margin: 0; font-size: 20px; font-weight: 900; }
 .card h2 a { color: inherit; text-decoration: none; }
 .card h2 a:hover { text-decoration: underline; }
-.card h3 { margin: 14px 0 4px; font-size: 15px; }
+.card .at {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 10px;
+  background: var(--yellow);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.card h3 {
+  margin: 14px 0 4px;
+  padding-left: 10px;
+  border-left: 6px solid var(--yellow);
+  font-size: 15px;
+  font-weight: 700;
+}
 .card p { margin: 6px 0; font-size: 14.5px; }
 .card ul { margin: 6px 0; padding-left: 20px; font-size: 14.5px; }
-.card .at { color: var(--muted); font-size: 13px; }
 .empty {
-  margin-top: 36px;
-  padding: 28px;
+  margin-top: 40px;
+  padding: 32px;
   text-align: center;
-  color: var(--muted);
-  border: 2px dashed var(--line);
-  border-radius: 14px;
+  color: var(--gray);
+  border: 2px dashed var(--grid);
+  border-radius: 12px;
 }
 footer {
-  margin-top: 48px;
-  color: var(--muted);
-  font-size: 13.5px;
+  margin-top: 56px;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--gray);
 }
-footer a { color: var(--muted); }
+footer a { color: var(--gray); }
 """
 
 
@@ -196,18 +242,21 @@ def main():
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>GitHub Playground · Profiles</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
 <style>%(style)s</style>
 </head>
 <body>
 <div class="wrap">
 <header>
   <h1>GitHub <span>Playground</span></h1>
-  <p>%(count)s — one file per person, living in <code>profiles/</code>. This page is rebuilt by CI on every merge.</p>
+  <p class="meta">%(count)s · PROFILES/ · REBUILT BY CI</p>
 </header>
 %(body)s
 <footer>
-  Add yourself: fork the repo, create <code>profiles/&lt;your-github-username&gt;.md</code>, open a pull request ·
-  <a href="%(repo)s">source on GitHub</a>
+  ADD YOURSELF: FORK → PROFILES/&lt;USERNAME&gt;.MD → PULL REQUEST ·
+  <a href="%(repo)s">SOURCE ON GITHUB</a>
 </footer>
 </div>
 </body>
