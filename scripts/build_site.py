@@ -82,7 +82,9 @@ header .meta {
   margin-top: 40px;
   display: grid;
   gap: 28px;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  /* min() lets the column shrink below 290px on narrow screens,
+     so phones get a single full-width column without overflow */
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
 }
 /* the CPU window card: ink border + yellow offset shadow */
 .card {
@@ -142,6 +144,24 @@ footer {
   color: var(--gray);
 }
 footer a { color: var(--gray); }
+
+/* ---------- phones ---------- */
+@media (max-width: 720px) {
+  .wrap { padding: 28px 20px 40px; }
+  /* the blueprint guides crowd the text on a phone — let them go */
+  .wrap::before { display: none; }
+  header h1 { font-size: 32px; }
+  .grid { margin-top: 28px; gap: 22px; }
+  .card {
+    padding: 18px;
+    box-shadow: 5px 5px 0 var(--yellow);
+  }
+  footer {
+    margin-top: 40px;
+    letter-spacing: 0.04em;
+    overflow-wrap: anywhere;
+  }
+}
 """
 
 
