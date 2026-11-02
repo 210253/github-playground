@@ -22,4 +22,9 @@ On every merge to `main`, `scripts/build_site.py` regenerates the roster page in
 
 ## The roster page
 
-GitHub Pages serves `docs/` → <https://comppsyunion.github.io/github-playground/> — one card per profile, avatars straight from `github.com/<username>.png`.
+<https://comppsyunion.github.io/github-playground/> — one card per profile, avatars straight from `github.com/<username>.png`.
+
+Two ways this page is served:
+
+- **Upstream (automatic):** Pages source is set to *GitHub Actions* — every merge to `main` makes CI build and deploy the site directly. Nothing to click, ever.
+- **Your fork (manual, classroom exercise):** `docs/index.html` is also committed to the repo, so in your own fork you can go to **Settings → Pages → Deploy from a branch → `main` / `/docs`** and get your own copy of the site.
