@@ -14,11 +14,55 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Collect the PR's changed files
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/files" \
+            --paginate --jq '.[] | [.status, .filename] | @tsv' > pr-files.tsv
+          cat pr-files.tsv
+
       - name: Run the profiles check
-        run: python scripts/check_profiles.py
+        env:
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          if [ -f pr-files.tsv ]; then
+            python scripts/check_profiles.py --author "${PR_AUTHOR}" --pr-files pr-files.tsv
+          else
+            python scripts/check_profiles.py
+          fi
+
+  auto-merge:
+    name: Auto-merge passing profile PRs
+    needs: check-profiles
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.draft == false &&
+      github.event.pull_request.base.ref == 'main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Squash merge the PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          sleep 5   # let the check conclusion settle
+          gh pr merge "$PR_NUMBER" --squash --subject "$PR_TITLE" || {
+            echo "::warning::auto-merge failed (maybe a review is required or the branch is protected) — merge manually."
+            exit 1
+          }
 
   publish-site:
     name: Build and deploy the roster site
@@ -52,6 +96,7 @@ jobs:
             echo "docs/index.html is up to date — nothing to commit."
           else
             git commit -m "chore: rebuild pages roster from profiles"
+            git pull --rebase
             git push
           fi
 

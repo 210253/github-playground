@@ -14,11 +14,12 @@ The hands-on playground for the CPU weekly session **GitHub Beyond the Code** �
 
 The workflow in `.github/workflows/ci.yml` runs `scripts/check_profiles.py` on every PR:
 
-- exactly one file per person, named `<github-username>.md` (letters, digits, hyphens; ≤ 39 chars);
-- at least 20 characters of content, starting with a `# Title` line;
-- files beginning with `_` are templates and are ignored.
+- a profile PR must change **exactly one file**, and it must be **`profiles/<your-github-username>.md`** — named after the PR author's own login, newly added (not modifying someone else's file);
+- the file needs at least 20 characters of content, starting with a `# Title` line;
+- files beginning with `_` are templates and are ignored;
+- anything else in the PR (extra files, wrong name, existing file) fails the check.
 
-On every merge to `main`, `scripts/build_site.py` regenerates the roster page into `docs/index.html`.
+**PRs that pass are merged automatically** — CI squash-merges them within seconds, no human clicking needed. A merge rebuilds the roster page below.
 
 ## The roster page
 
