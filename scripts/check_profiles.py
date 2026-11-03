@@ -94,8 +94,12 @@ def read_pr_rows(pr_files_path):
     return rows
 
 
-def run_pr_check(author, rows):
-    """Layer 2. Returns (ok, info-dict)."""
+def run_pr_check(author, rows, expect):
+    """Layer 2. Returns (ok, info-dict).
+
+    `expect` is "added" for docs/* branches (first-time profile) or
+    "modified" for fix/* branches (update your own profile).
+    """
     expected = "profiles/%s.md" % author
     errors = []
     if len(rows) != 1:
@@ -114,21 +118,29 @@ def run_pr_check(author, rows):
                 "your own GitHub username (@%s)"
                 % (filename, expected, author)
             )
-        if status != "added":
+        if status == expect:
+            pass
+        elif expect == "added":
             errors.append(
-                "%s must be a NEW file (GitHub reports status %r) — "
-                "each person adds exactly one profile; if it already "
-                "exists, edit your own file instead of adding it again"
+                "%s must be a NEW file (GitHub reports status %r) — to "
+                "update your existing profile, use a fix/* branch instead"
                 % (expected, status)
+            )
+        else:
+            errors.append(
+                "a fix/* PR must MODIFY your existing profile (GitHub "
+                "reports status %r for %s) — if your profile does not "
+                "exist yet, use a docs/* branch" % (status, expected)
             )
     for message in errors:
         note_error(message)
     if not errors:
-        print("PR check: adds exactly one new file, %s — matches author "
-              "@%s." % (expected, author))
+        print("PR check: %s exactly one file, %s — matches author @%s."
+              % (expect + "s", expected, author))
     return not errors, {
         "author": author,
         "expected": expected,
+        "expect": expect,
         "rows": rows,
         "errors": errors,
     }
@@ -142,7 +154,8 @@ def write_summary(passed, pr_info):
     if pr_info:
         summary("### PR rules — author @%s" % pr_info["author"])
         summary("")
-        summary("Expected file: `%s`" % pr_info["expected"])
+        summary("Expected: %s `%s`"
+                % (pr_info["expect"], pr_info["expected"]))
         summary("")
         summary("| Status | File |")
         summary("| --- | --- |")
@@ -155,7 +168,8 @@ def write_summary(passed, pr_info):
             for message in pr_info["errors"]:
                 summary("- ❌ %s" % md_cell(message))
         else:
-            summary("Exactly one new file, named after the PR author. ✅")
+            summary("Exactly one file (%s), named after the PR author. ✅"
+                    % pr_info["expect"])
         summary("")
 
 
@@ -169,6 +183,11 @@ def main():
         "--pr-files", default=None,
         help="TSV file of <status>\\t<path> changed in the PR",
     )
+    parser.add_argument(
+        "--expect", choices=["added", "modified"], default="added",
+        help="docs/* branches must ADD their profile; fix/* branches "
+             "must MODIFY it",
+    )
     args = parser.parse_args()
 
     ok, repo_results = run_repo_check()
@@ -176,7 +195,7 @@ def main():
     pr_info = None
     if args.author and args.pr_files:
         pr_ok, pr_info = run_pr_check(
-            args.author, read_pr_rows(args.pr_files)
+            args.author, read_pr_rows(args.pr_files), args.expect
         )
         ok = pr_ok and ok
     elif args.author or args.pr_files:

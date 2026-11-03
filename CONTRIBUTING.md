@@ -21,16 +21,32 @@ in the browser, no tools installed.
 6. CI checks your PR. When it passes, the robot squash-merges it within
    seconds — and the roster page rebuilds automatically.
 
+## Update your profile later
+
+Already merged once and want to change your intro? Same flow, one
+difference — the branch prefix and the verb:
+
+1. In your fork, create a branch named `fix/<your-username>`.
+2. Edit **your own** `profiles/<your-github-username>.md`.
+3. Commit, open a pull request to `main` — CI verifies you modify
+   exactly one file (yours) and the robot squash-merges it.
+
+`docs/*` = add your profile for the first time; `fix/*` = update your
+own. Mixing them up fails the check with a hint pointing you to the
+right prefix.
+
 ## The contract CI enforces
 
-Pull requests from `docs/*` branches are validated by
+Pull requests from `docs/*` and `fix/*` branches are validated by
 `scripts/check_profiles.py` (see the run's Summary page for the report):
 
 - the PR changes **exactly one file**;
 - the file is **`profiles/<your-github-username>.md`** — named after the
-  PR author's own login, and newly added (not someone else's file).
-  The match is **case-sensitive**: copy your username's exact casing,
+  PR author's own login, and nobody else's. The match is
+  **case-sensitive**: copy your username's exact casing,
   e.g. `HarleyZHOUzzz` → `profiles/HarleyZHOUzzz.md`;
+- on a `docs/*` branch the file must be **newly added**; on a `fix/*`
+  branch it must be a **modification of your existing profile**;
 - the content is at least 20 characters and starts with a `# Title` line, for example, `# Robert He`.
 
 Anything else fails the check with an explanation, and the robot will not
