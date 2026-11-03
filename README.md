@@ -12,14 +12,14 @@ The hands-on playground for the CPU weekly session **GitHub Beyond the Code** �
 
 ## The rules (enforced by CI)
 
-The workflow in `.github/workflows/ci.yml` runs `scripts/check_profiles.py` on every PR:
+The workflow in `.github/workflows/ci.yml` runs `scripts/check_profiles.py` on every PR. The strict per-PR rules apply **only to PRs from `docs/*` branches**, and are skipped for maintainers (maintain/admin permission) and the `PROFILE_BYPASS` list in the workflow:
 
 - a profile PR must change **exactly one file**, and it must be **`profiles/<your-github-username>.md`** — named after the PR author's own login, newly added (not modifying someone else's file);
 - the file needs at least 20 characters of content, starting with a `# Title` line;
 - files beginning with `_` are templates and are ignored;
 - anything else in the PR (extra files, wrong name, existing file) fails the check.
 
-**PRs that pass are merged automatically** — CI squash-merges them within seconds, no human clicking needed. A merge rebuilds the roster page below.
+**`docs/*` PRs that pass are merged automatically** — CI squash-merges them within seconds, no human clicking needed. Maintainer PRs from other branches are merged manually. A merge rebuilds the roster page below.
 
 ## The roster page
 

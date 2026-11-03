@@ -8,6 +8,11 @@ on:
 permissions:
   contents: read
 
+env:
+  # logins that skip the strict per-PR profile rules (maintainers with
+  # maintain/admin permission are skipped automatically, too)
+  PROFILE_BYPASS: hnrobert
+
 jobs:
   check-profiles:
     name: Check profiles/
@@ -30,11 +35,38 @@ jobs:
             --paginate --jq '.[] | [.status, .filename] | @tsv' > pr-files.tsv
           cat pr-files.tsv
 
+      # The strict rules (exactly one file, named after the PR author)
+      # apply only to PRs from docs/* branches, and never to bypassed
+      # logins or maintain/admin collaborators.
+      - name: Decide whether the strict profile rules apply
+        id: scope
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+        run: |
+          branch="${{ github.event.pull_request.head.ref }}"
+          bypass=no
+          for user in $PROFILE_BYPASS; do
+            [ "$user" = "$PR_AUTHOR" ] && bypass=yes
+          done
+          if [ "$bypass" = no ]; then
+            perm=$(gh api "repos/${{ github.repository }}/collaborators/$PR_AUTHOR/permission" \
+              --jq .permission 2>/dev/null || echo none)
+            case "$perm" in maintain|admin) bypass=yes ;; esac
+          fi
+          strict=no
+          if [ "$bypass" = no ] && [[ "$branch" == docs/* ]]; then
+            strict=yes
+          fi
+          echo "strict=$strict" >> "$GITHUB_OUTPUT"
+          echo "branch=$branch author=$PR_AUTHOR bypass=$bypass strict=$strict"
+
       - name: Run the profiles check
         env:
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
         run: |
-          if [ -f pr-files.tsv ]; then
+          if [ "${{ steps.scope.outputs.strict }}" = yes ] && [ -f pr-files.tsv ]; then
             python scripts/check_profiles.py --author "${PR_AUTHOR}" --pr-files pr-files.tsv
           else
             python scripts/check_profiles.py
@@ -46,7 +78,8 @@ jobs:
     if: >-
       github.event_name == 'pull_request' &&
       github.event.pull_request.draft == false &&
-      github.event.pull_request.base.ref == 'main'
+      github.event.pull_request.base.ref == 'main' &&
+      startsWith(github.event.pull_request.head.ref, 'docs/')
     runs-on: ubuntu-latest
     permissions:
       contents: write
