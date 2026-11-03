@@ -18,11 +18,11 @@ jobs:
     name: Check profiles/
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
@@ -92,7 +92,7 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
         run: |
           sleep 5   # let the check conclusion settle
-          gh pr merge "$PR_NUMBER" --squash --subject "$PR_TITLE" || {
+          gh pr merge -R "${{ github.repository }}" "$PR_NUMBER" --squash --subject "$PR_TITLE" || {
             echo "::warning::auto-merge failed (maybe a review is required or the branch is protected) — merge manually."
             exit 1
           }
@@ -110,8 +110,8 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
 
