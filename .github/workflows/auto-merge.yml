@@ -1,0 +1,61 @@
+name: Auto-merge
+
+# Merging must live in its own workflow_run-triggered workflow: for PRs
+# opened from forks, the GITHUB_TOKEN inside the pull_request CI run is
+# read-only on the base repo by design ("Resource not accessible by
+# integration"). workflow_run executes in the base repository context
+# with write permissions. This workflow only makes API calls — it never
+# checks out pull request code.
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  squash-merge:
+    name: Squash merge passing docs PRs
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find the open PR for this head SHA
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          pr="$(gh api "repos/${{ github.repository }}/pulls?state=open" \
+            --jq ".[] | select(.head.sha == \"$HEAD_SHA\" and .draft == false and .base.ref == \"main\") | .number" \
+            | head -n1 || true)"
+          if [ -z "$pr" ]; then
+            echo "No matching open PR — nothing to merge."
+            echo "skip=yes" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          branch="$(gh api "repos/${{ github.repository }}/pulls/$pr" --jq .head.ref)"
+          case "$branch" in
+            docs/*) ;;
+            *) echo "Branch '$branch' is not docs/* — leaving the merge to a human."
+               echo "skip=yes" >> "$GITHUB_OUTPUT"
+               exit 0 ;;
+          esac
+          echo "pr=$pr" >> "$GITHUB_OUTPUT"
+          echo "Merging PR #$pr (branch $branch)."
+
+      - name: Squash merge it
+        if: steps.find.outputs.skip != 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ steps.find.outputs.pr }}
+        run: |
+          title="$(gh api "repos/${{ github.repository }}/pulls/$PR" --jq .title)"
+          gh pr merge -R "${{ github.repository }}" "$PR" --squash --subject "$title" || {
+            echo "::warning::merge failed (review required or branch protected?) — merge manually."
+            exit 1
+          }

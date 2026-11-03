@@ -72,31 +72,6 @@ jobs:
             python scripts/check_profiles.py
           fi
 
-  auto-merge:
-    name: Auto-merge passing profile PRs
-    needs: check-profiles
-    if: >-
-      github.event_name == 'pull_request' &&
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.base.ref == 'main' &&
-      startsWith(github.event.pull_request.head.ref, 'docs/')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-      pull-requests: write
-    steps:
-      - name: Squash merge the PR
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-        run: |
-          sleep 5   # let the check conclusion settle
-          gh pr merge -R "${{ github.repository }}" "$PR_NUMBER" --squash --subject "$PR_TITLE" || {
-            echo "::warning::auto-merge failed (maybe a review is required or the branch is protected) — merge manually."
-            exit 1
-          }
-
   publish-site:
     name: Build and deploy the roster site
     needs: check-profiles
