@@ -28,7 +28,9 @@ Pull requests from `docs/*` branches are validated by
 
 - the PR changes **exactly one file**;
 - the file is **`profiles/<your-github-username>.md`** — named after the
-  PR author's own login, and newly added (not someone else's file);
+  PR author's own login, and newly added (not someone else's file).
+  The match is **case-sensitive**: copy your username's exact casing,
+  e.g. `HarleyZHOUzzz` → `profiles/HarleyZHOUzzz.md`;
 - the content is at least 20 characters and starts with a `# Title` line, for example, `# Robert He`.
 
 Anything else fails the check with an explanation, and the robot will not
