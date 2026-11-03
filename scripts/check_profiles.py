@@ -12,11 +12,13 @@ Two layers of rules:
    profiles/<pr-author-login>.md — named after the PR author's own
    GitHub username. Anything else is an error.
 
-Exit code is non-zero when any rule is broken; messages carry GitHub
-Actions annotations so they show up right on the PR.
+Output goes to the console, to GitHub Actions annotations (::error),
+and — when running inside Actions — to the job summary page via
+$GITHUB_STEP_SUMMARY.
 """
 
 import argparse
+import os
 import re
 import sys
 from pathlib import Path
@@ -25,10 +27,21 @@ USERNAME_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})$")
 MIN_CHARS = 20
 ROOT = Path(__file__).resolve().parent.parent
 PROFILES = ROOT / "profiles"
+SUMMARY_PATH = os.environ.get("GITHUB_STEP_SUMMARY")
 
 
 def note_error(message):
     print("::error::%s" % message.replace("\n", " "))
+
+
+def summary(text):
+    if SUMMARY_PATH:
+        with open(SUMMARY_PATH, "a", encoding="utf-8") as fh:
+            fh.write(text + "\n")
+
+
+def md_cell(text):
+    return text.replace("|", "\\|").replace("\n", " ")
 
 
 def check_file(path):
@@ -42,40 +55,33 @@ def check_file(path):
     text = path.read_text(encoding="utf-8").strip()
     if len(text) < MIN_CHARS:
         errors.append(
-            "%s: content is too short — write at least %d characters about "
-            "yourself (got %d)" % (path.name, MIN_CHARS, len(text))
+            "%s: content is too short — write at least %d characters "
+            "about yourself (got %d)" % (path.name, MIN_CHARS, len(text))
         )
     if not any(line.startswith("# ") for line in text.splitlines()):
         errors.append('%s: start the file with a "# Title" line' % path.name)
     return errors
 
 
-def check_repo():
-    """Layer 1: every profile in the repo is well-formed."""
+def run_repo_check():
+    """Layer 1. Returns (ok, [(filename, errors)])."""
     if not PROFILES.is_dir():
         note_error("profiles/ directory is missing")
-        return False
+        return False, []
     files = sorted(
         p for p in PROFILES.glob("*.md") if not p.name.startswith("_")
     )
-    if not files:
-        print("profiles/ is empty — no profiles to check yet.")
-        return True
-
-    ok = True
-    for path in files:
-        for message in check_file(path):
+    results = [(p.name, check_file(p)) for p in files]
+    for name, errors in results:
+        for message in errors:
             note_error(message)
-            ok = False
-        if not check_file(path):
-            print("OK  %s" % path.name)
-    print("Repo check: %d profile(s) scanned%s"
-          % (len(files), "" if ok else " — problems found above"))
-    return ok
+        if not errors:
+            print("OK  %s" % name)
+    print("Repo check: %d profile(s) scanned" % len(results))
+    return all(not e for _, e in results), results
 
 
-def check_pr(author, pr_files_path):
-    """Layer 2: this PR adds exactly one file — profiles/<author>.md."""
+def read_pr_rows(pr_files_path):
     rows = []
     for line in Path(pr_files_path).read_text(encoding="utf-8").splitlines():
         if not line.strip():
@@ -85,10 +91,13 @@ def check_pr(author, pr_files_path):
             rows.append((parts[0], parts[1]))
         else:
             rows.append(("changed", parts[0]))
+    return rows
 
+
+def run_pr_check(author, rows):
+    """Layer 2. Returns (ok, info-dict)."""
     expected = "profiles/%s.md" % author
     errors = []
-
     if len(rows) != 1:
         preview = ", ".join(name for _, name in rows[:5]) or "nothing"
         errors.append(
@@ -96,6 +105,7 @@ def check_pr(author, pr_files_path):
             "%d (%s). Keep the PR to your own profile only."
             % (len(rows), preview)
         )
+        status = rows[0][0] if len(rows) == 1 else "multiple"
     else:
         status, filename = rows[0]
         if filename != expected:
@@ -104,20 +114,64 @@ def check_pr(author, pr_files_path):
                 "your own GitHub username (@%s)"
                 % (filename, expected, author)
             )
-        if status not in ("added",):
+        if status != "added":
             errors.append(
-                "%s must be a NEW file (GitHub reports status %r) — each "
-                "person adds exactly one profile; if it already exists, "
-                "edit your own file instead of adding it again"
+                "%s must be a NEW file (GitHub reports status %r) — "
+                "each person adds exactly one profile; if it already "
+                "exists, edit your own file instead of adding it again"
                 % (expected, status)
             )
-
     for message in errors:
         note_error(message)
     if not errors:
         print("PR check: adds exactly one new file, %s — matches author "
               "@%s." % (expected, author))
-    return not errors
+    return not errors, {
+        "author": author,
+        "expected": expected,
+        "rows": rows,
+        "errors": errors,
+    }
+
+
+def write_summary(passed, repo_results, pr_info):
+    """Render the report onto the Actions job summary page."""
+    summary("## Profiles check — %s" % ("PASS ✅" if passed else "FAIL ❌"))
+    summary("")
+
+    summary("### Repo profiles (%d)" % len(repo_results))
+    summary("")
+    if repo_results:
+        summary("| Profile | Result |")
+        summary("| --- | --- |")
+        for name, errors in repo_results:
+            if errors:
+                cell = "<br>".join(md_cell(e) for e in errors)
+                summary("| `%s` | ❌ %s |" % (md_cell(name), cell))
+            else:
+                summary("| `%s` | ✅ |" % md_cell(name))
+    else:
+        summary("_profiles/ is empty — nothing to check yet._")
+    summary("")
+
+    if pr_info:
+        summary("### PR rules — author @%s" % pr_info["author"])
+        summary("")
+        summary("Expected file: `%s`" % pr_info["expected"])
+        summary("")
+        summary("| Status | File |")
+        summary("| --- | --- |")
+        for status, filename in pr_info["rows"]:
+            summary("| %s | `%s` |" % (md_cell(status), md_cell(filename)))
+        if not pr_info["rows"]:
+            summary("| _none_ | _no changed files reported_ |")
+        summary("")
+        if pr_info["errors"]:
+            for message in pr_info["errors"]:
+                summary("- ❌ %s" % md_cell(message))
+        else:
+            summary("Exactly one new file, named after the PR author. ✅")
+        summary("")
 
 
 def main():
@@ -132,16 +186,24 @@ def main():
     )
     args = parser.parse_args()
 
-    ok = check_repo()
+    ok, repo_results = run_repo_check()
 
+    pr_info = None
     if args.author and args.pr_files:
-        ok = check_pr(args.author, args.pr_files) and ok
+        pr_ok, pr_info = run_pr_check(
+            args.author, read_pr_rows(args.pr_files)
+        )
+        ok = pr_ok and ok
     elif args.author or args.pr_files:
         note_error("--author and --pr-files must be given together")
         ok = False
 
+    write_summary(ok, repo_results, pr_info)
+
     print("")
     print("Profiles check: %s" % ("PASS" if ok else "FAIL"))
+    if SUMMARY_PATH:
+        print("Report also written to the job summary.")
     return 0 if ok else 1
 
 
