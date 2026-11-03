@@ -134,24 +134,9 @@ def run_pr_check(author, rows):
     }
 
 
-def write_summary(passed, repo_results, pr_info):
+def write_summary(passed, pr_info):
     """Render the report onto the Actions job summary page."""
     summary("## Profiles check — %s" % ("PASS ✅" if passed else "FAIL ❌"))
-    summary("")
-
-    summary("### Repo profiles (%d)" % len(repo_results))
-    summary("")
-    if repo_results:
-        summary("| Profile | Result |")
-        summary("| --- | --- |")
-        for name, errors in repo_results:
-            if errors:
-                cell = "<br>".join(md_cell(e) for e in errors)
-                summary("| `%s` | ❌ %s |" % (md_cell(name), cell))
-            else:
-                summary("| `%s` | ✅ |" % md_cell(name))
-    else:
-        summary("_profiles/ is empty — nothing to check yet._")
     summary("")
 
     if pr_info:
@@ -198,7 +183,7 @@ def main():
         note_error("--author and --pr-files must be given together")
         ok = False
 
-    write_summary(ok, repo_results, pr_info)
+    write_summary(ok, pr_info)
 
     print("")
     print("Profiles check: %s" % ("PASS" if ok else "FAIL"))
