@@ -60,8 +60,8 @@ not auto-merged and are reviewed manually.
 
 ```bash
 python scripts/check_profiles.py       # run the same checks locally
-python scripts/build_site.py           # rebuild docs/index.html + roster
+python scripts/build_site.py           # preview the roster page locally
 ```
 
-`docs/index.html` is regenerated and committed by CI on every merge to
-`main`; you should never need to edit it by hand.
+The roster page is built by CI and deployed as a Pages artifact;
+`docs/` is generated output, gitignored, and never committed.
