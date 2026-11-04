@@ -4,6 +4,9 @@ on:
   pull_request:
   push:
     branches: [main]
+  # dispatched by auto-merge after a robot merge: GITHUB_TOKEN pushes do
+  # not fire `push` events (recursion guard), but workflow_dispatch does.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -83,7 +86,7 @@ jobs:
   publish-site:
     name: Build and deploy the roster site
     needs: check-profiles
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       pages: write
