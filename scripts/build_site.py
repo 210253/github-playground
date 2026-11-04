@@ -132,6 +132,12 @@ header .meta {
   0% { background: var(--yellow); transform: scale(0.96); }
   100% { background: #ffffff; transform: scale(1); }
 }
+/* an existing card whose content was swapped in by live refresh */
+.card--updated { animation: updatecard 2.4s ease-out; }
+@keyframes updatecard {
+  0%, 45% { background: var(--yellow); }
+  100% { background: #ffffff; }
+}
 .empty {
   margin-top: 40px;
   padding: 32px;
@@ -240,12 +246,12 @@ SCRIPT = """
   }
 
   /* ---------- data refresh ---------- */
-  function existing() {
-    var names = {};
+  function cardMap() {
+    var map = {};
     grid.querySelectorAll('.card[data-user]').forEach(function (c) {
-      names[c.getAttribute('data-user')] = true;
+      map[c.getAttribute('data-user')] = c;
     });
-    return names;
+    return map;
   }
 
   function updateCount(n) {
@@ -256,7 +262,9 @@ SCRIPT = """
   }
 
   function fetchNew() {
-    /* re-fetch the page itself and diff its cards against the live DOM */
+    /* re-fetch the page itself and diff its cards against the live DOM:
+       append brand-new users, and swap in edited content for existing
+       ones (fix/* updates) so the stage view never goes stale */
     fetch(window.location.href, { cache: 'no-store' })
       .then(function (r) { return r.ok ? r.text() : null; })
       .then(function (text) {
@@ -264,19 +272,28 @@ SCRIPT = """
         var doc = new DOMParser().parseFromString(text, 'text/html');
         var fresh = doc.querySelectorAll('.card[data-user]');
         if (!fresh.length) return;
-        var have = existing();
-        var added = 0;
+        var live = cardMap();
+        var changed = 0;
         fresh.forEach(function (card) {
-          if (have[card.getAttribute('data-user')]) return;
-          var node = document.importNode(card, true);
-          node.classList.add('card--new');
-          grid.appendChild(node);
-          added++;
+          var user = card.getAttribute('data-user');
+          var current = live[user];
+          if (!current) {
+            var node = document.importNode(card, true);
+            node.classList.add('card--new');
+            grid.appendChild(node);
+            changed++;
+            return;
+          }
+          if (current.innerHTML.trim() === card.innerHTML.trim()) return;
+          var updated = document.importNode(card, true);
+          updated.classList.add('card--updated');
+          current.replaceWith(updated);
+          changed++;
         });
-        if (!added) return;
+        if (!changed) return;
         var empty = grid.querySelector('.empty');
         if (empty) empty.remove();
-        updateCount(Object.keys(existing()).length);
+        updateCount(Object.keys(cardMap()).length);
       })
       .catch(function () { /* stage safety: stay quiet on network hiccups */ });
   }
@@ -295,7 +312,7 @@ SCRIPT = """
       cancelAnimationFrame(raf); raf = null;
       clearInterval(timer); timer = null;
     }
-    updateCount(Object.keys(existing()).length);
+    updateCount(Object.keys(cardMap()).length);
   });
 })();
 """
