@@ -40,15 +40,26 @@ jobs:
             exit 0
           fi
           branch="$(gh api "repos/${{ github.repository }}/pulls/$pr" --jq .head.ref)"
+          body="$(gh api "repos/${{ github.repository }}/pulls/$pr" --jq '.body // empty')"
           case "$branch" in
             docs/*|fix/*) ;;
-            *) echo "Branch '$branch' is neither docs/* nor fix/* — leaving the merge to a human."
-               echo "skip=yes" >> "$GITHUB_OUTPUT"
-               exit 0 ;;
+            *)
+              # any other branch merges too when the PR body asks for it
+              if printf '%s' "$body" | grep -qi '\[auto merge\]'; then
+                echo "Branch '$branch' is outside docs/*|fix/*, but the PR body requests [auto merge]."
+              else
+                echo "Branch '$branch' is neither docs/* nor fix/* — leaving the merge to a human."
+                echo "skip=yes" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              ;;
           esac
           echo "pr=$pr" >> "$GITHUB_OUTPUT"
           echo "Merging PR #$pr (branch $branch)."
 
+      # The squash commit message carries the PR description too, so closing
+      # keywords like "Fixes #N" written in the description land on main and
+      # auto-close the linked issue (the bot merge itself does not close it).
       - name: Squash merge it
         if: steps.find.outputs.skip != 'yes'
         env:
@@ -56,7 +67,9 @@ jobs:
           PR: ${{ steps.find.outputs.pr }}
         run: |
           title="$(gh api "repos/${{ github.repository }}/pulls/$PR" --jq .title)"
-          gh pr merge -R "${{ github.repository }}" "$PR" --squash --subject "$title" || {
+          body="$(gh api "repos/${{ github.repository }}/pulls/$PR" --jq '.body // empty')"
+          gh pr merge -R "${{ github.repository }}" "$PR" --squash \
+            --subject "$title" --body "$body" || {
             echo "::warning::merge failed (review required or branch protected?) — merge manually."
             exit 1
           }
