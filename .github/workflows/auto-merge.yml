@@ -40,11 +40,19 @@ jobs:
             exit 0
           fi
           branch="$(gh api "repos/${{ github.repository }}/pulls/$pr" --jq .head.ref)"
+          body="$(gh api "repos/${{ github.repository }}/pulls/$pr" --jq '.body // empty')"
           case "$branch" in
             docs/*|fix/*) ;;
-            *) echo "Branch '$branch' is neither docs/* nor fix/* — leaving the merge to a human."
-               echo "skip=yes" >> "$GITHUB_OUTPUT"
-               exit 0 ;;
+            *)
+              # any other branch merges too when the PR body asks for it
+              if printf '%s' "$body" | grep -qi '\[auto merge\]'; then
+                echo "Branch '$branch' is outside docs/*|fix/*, but the PR body requests [auto merge]."
+              else
+                echo "Branch '$branch' is neither docs/* nor fix/* — leaving the merge to a human."
+                echo "skip=yes" >> "$GITHUB_OUTPUT"
+                exit 0
+              fi
+              ;;
           esac
           echo "pr=$pr" >> "$GITHUB_OUTPUT"
           echo "Merging PR #$pr (branch $branch)."
